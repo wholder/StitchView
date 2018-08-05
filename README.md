@@ -1,7 +1,7 @@
 <p align="center"><img src="https://github.com/wholder/StitchView/blob/master/images/StitchView.gif"></p>
 
 ## StitchView
-This code allows you to view several types of embroidery files and has an extensible framework to suport easily adding other formats by extending the StitchPatern class.  The current formats supported are:
+This code allows you to view several types of embroidery files and has an extensible framework to suport easily adding other formats by extending the StitchPattern class.  The current formats supported are:
 
  - **`.pes`** - Used by Brother and Babylock embroidery home sewing machines
  - **`.dst`** - Used by Tajima commercial embroidery sewing machines
