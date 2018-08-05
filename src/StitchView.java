@@ -133,7 +133,7 @@ class StitchView extends JPanel {
     }
     pattern.printColors();
     pattern.printInfo();
-    JFrame frame = new JFrame("PES Embroider File Viewer");
+    JFrame frame = new JFrame("StitchView");
     frame.setResizable(false);
     frame.setLayout(new BorderLayout());
     StitchView stitches = new StitchView(pattern);
@@ -143,11 +143,11 @@ class StitchView extends JPanel {
     JPanel bottomPane = new JPanel(new BorderLayout());
     bottomPane.setBorder(new EmptyBorder(0, 10, 0, 10));
     bottomPane.add(slider, BorderLayout.CENTER);
-    JButton left = new JButton("<");
+    JButton left = new JButton("\u25C0");
     left.addActionListener(e -> stitches.decStep());
     left.setPreferredSize(new Dimension(24, 12));
     bottomPane.add(left, BorderLayout.WEST);
-    JButton right = new JButton(">");
+    JButton right = new JButton("\u25B6");
     right.addActionListener(e -> stitches.incStep());
     right.setPreferredSize(new Dimension(24, 12));
     bottomPane.add(right, BorderLayout.EAST);
