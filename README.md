@@ -1,4 +1,5 @@
-<p align="center"><img src="https://github.com/wholder/StitchView/blob/master/images/StitchView%20Screenshot.png"></p>
+<p align="center"><img src="https://github.com/wholder/StitchView/blob/master/images/StitchView.gif"></p>
+
 
 ## StitchView
 This code allows you to view .pes, .dst and .exp format embroidery files. From the command line type:
