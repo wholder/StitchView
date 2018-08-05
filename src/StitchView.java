@@ -1,12 +1,20 @@
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
+import java.awt.font.GlyphVector;
+import java.awt.font.TextAttribute;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.prefs.Preferences;
 
 class StitchView extends JPanel {
+  private static Preferences  prefs = Preferences.userRoot().node(StitchView.class.getName());
   private static final int    BUFFER_STEPS = 4000;
   private StitchPattern       pattern;
   private BufferedImage       offScr;
@@ -14,13 +22,58 @@ class StitchView extends JPanel {
   private List<Point>         starts;
   private Rectangle           bounds;
   private Dimension           lastDim;
+  private JFrame              frame;
   private int                 aStep, numSteps;
 
-  private StitchView (StitchPattern pattern) {
-    this.pattern = pattern;
+  private StitchView (JFrame frame) {
+    this.frame = frame;
+    bounds = new Rectangle(0, 0, 640, 400);
+    setPreferredSize(new Dimension(640, 400));
+  }
+
+  private void loadFile (File file) throws IOException {
+    String fName = file.getName();
+    int idx = fName.lastIndexOf(".");
+    if (idx > 0) {
+      switch (fName.substring(idx + 1).toLowerCase()) {
+      case "pes":
+        pattern = new PesPattern(getFile(file));
+        break;
+      case "dst":
+        pattern = new DstPattern(getFile(file));
+        break;
+      case "exp":
+        pattern = new ExpPattern(getFile(file));
+        break;
+      default:
+        System.out.println("Unknown file type: " + fName);
+        return;
+      }
+    } else {
+      return;
+    }
     bounds = pattern.getBounds();
     setPreferredSize(new Dimension(bounds.width, bounds.height));
     numSteps = aStep = pattern.getStitches().size();
+    // Setup slider and button controls
+    JSlider slider = new JSlider(JSlider.HORIZONTAL, 0, pattern.getStitchCount(), pattern.getStitchCount());
+    slider.addChangeListener(ev -> setStep(slider.getValue()));
+    JPanel bottomPane = new JPanel(new BorderLayout());
+    bottomPane.setBorder(new EmptyBorder(0, 10, 0, 10));
+    bottomPane.add(slider, BorderLayout.CENTER);
+    JButton left = new JButton("\u25C0");
+    left.addActionListener(e -> decStep());
+    left.setPreferredSize(new Dimension(24, 12));
+    bottomPane.add(left, BorderLayout.WEST);
+    JButton right = new JButton("\u25B6");
+    right.addActionListener(e -> incStep());
+    right.setPreferredSize(new Dimension(24, 12));
+    bottomPane.add(right, BorderLayout.EAST);
+    frame.add(bottomPane, BorderLayout.SOUTH);
+    frame.pack();
+    pattern.printColors();
+    pattern.printInfo();
+    repaint();
   }
 
   public void paint (Graphics g) {
@@ -58,33 +111,53 @@ class StitchView extends JPanel {
       start = 0;
     }
     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-    List<StitchPattern.Stitch> stitches = pattern.getStitches();
-    for (int ii = start; ii < stitches.size(); ii++) {
-      if (ii >= aStep) {
-        break;
+    if (pattern != null) {
+      List<StitchPattern.Stitch> stitches = pattern.getStitches();
+      for (int ii = start; ii < stitches.size(); ii++) {
+        if (ii >= aStep) {
+          break;
+        }
+        StitchPattern.Stitch stitch = stitches.get(ii);
+        int xLoc = stitch.xx - bounds.x;
+        int yLoc = stitch.yy - bounds.y;
+        g2.setColor(stitch.color);
+        g2.drawLine(lastX, lastY, xLoc, yLoc);
+        lastX = xLoc;
+        lastY = yLoc;
+        int bufIdx = ii / BUFFER_STEPS;
+        if (bufIdx > 0 && buffers.size() < bufIdx) {
+          BufferedImage newBuf = new BufferedImage(drawBuf.getWidth(), drawBuf.getHeight(), drawBuf.getType());
+          Graphics gc = newBuf.getGraphics();
+          gc.drawImage(drawBuf, 0, 0, null);
+          gc.dispose();
+          buffers.add(newBuf);
+          starts.add(new Point(lastX, lastY));
+        }
       }
-      StitchPattern.Stitch stitch = stitches.get(ii);
-      int xLoc = stitch.xx - bounds.x;
-      int yLoc = stitch.yy - bounds.y;
-      g2.setColor(stitch.color);
-      g2.drawLine(lastX, lastY, xLoc, yLoc);
-      lastX = xLoc;
-      lastY = yLoc;
-      int bufIdx = ii / BUFFER_STEPS;
-      if (bufIdx > 0 && buffers.size() < bufIdx) {
-        BufferedImage newBuf = new BufferedImage(drawBuf.getWidth(), drawBuf.getHeight(), drawBuf.getType());
-        Graphics gc = newBuf.getGraphics();
-        gc.drawImage(drawBuf, 0, 0, null);
-        gc.dispose();
-        buffers.add(newBuf);
-        starts.add(new Point(lastX, lastY));
-      }
+      // Draw magenta Plus sign (+) at starting point of pattern
+      g2.setStroke(new BasicStroke(3.0f));
+      g2.setColor(Color.magenta);
+      g2.drawLine(startX - 8, startY, startX + 8, startY);
+      g2.drawLine(startX, startY - 8, startX, startY + 8);
+    } else {
+      // Draw Title Page
+      Dimension size = getSize();
+      String text = this.getClass().getSimpleName();
+      // Set up Font attributes for title page
+      HashMap<TextAttribute, Object> attrs = new HashMap<>();
+      attrs.put(TextAttribute.KERNING, TextAttribute.KERNING_ON);
+      attrs.put(TextAttribute.LIGATURES, TextAttribute.LIGATURES_ON);
+      Font ocr = (new Font("Times", Font.PLAIN, 110)).deriveFont(attrs);
+      GlyphVector gv = ocr.createGlyphVector(g2.getFontRenderContext(), text);
+      Rectangle2D bnds = gv.getVisualBounds();
+      AffineTransform at = new AffineTransform();
+      at.translate(-bnds.getX() + (size.width - bnds.getWidth()) / 2, -bnds.getY() + (size.height - bnds.getHeight()) / 2);
+      g2.setColor(Color.lightGray);
+      g2.fill(at.createTransformedShape(gv.getOutline()));
+      at.translate(-4, -4);
+      g2.setColor(Color.black);
+      g2.fill(at.createTransformedShape(gv.getOutline()));
     }
-    // Draw magenta Plus sign (+) at starting point of pattern
-    g2.setStroke(new BasicStroke(3.0f));
-    g2.setColor(Color.magenta);
-    g2.drawLine(startX - 8, startY, startX + 8, startY);
-    g2.drawLine(startX, startY - 8, startX, startY + 8);
     g.drawImage(drawBuf, 0, 0, this);
   }
 
@@ -107,58 +180,47 @@ class StitchView extends JPanel {
     }
   }
 
-  public static void main (String[] args) throws IOException {
-    if (args.length < 1) {
-      System.out.println("Usage: java -jar StitchView.jar <file.pes|file.dst");
-      System.exit(1);
-    }
-    StitchPattern pattern = new StitchPattern();
-    int idx = args[0].lastIndexOf(".");
-    if (idx > 0) {
-      switch (args[0].substring(idx + 1).toLowerCase()) {
-      case "pes":
-        pattern = new PesPattern(getFile(args[0]));
-        break;
-      case "dst":
-        pattern = new DstPattern(getFile(args[0]));
-        break;
-      case "exp":
-        pattern = new ExpPattern(getFile(args[0]));
-        break;
-      default:
-        System.out.println("Unknown file type: " + args[0]);
-      }
-    } else {
-      System.out.println("Usage: java -jar StitchView.jar <file.pes|file.dst");
-    }
-    pattern.printColors();
-    pattern.printInfo();
+  public static void main (String[] args) {
     JFrame frame = new JFrame("StitchView");
+    StitchView stitchView = new StitchView(frame);
+    JMenuBar menuBar = new JMenuBar();
+    // Add "File" Menu
+    JMenu fileMenu = new JMenu("File");
+    // Add "Open" Item to File Menu
+    JMenuItem loadGbr = new JMenuItem("Open Embroidery File");
+    loadGbr.addActionListener(ev -> {
+      JFileChooser fileChooser = new JFileChooser();
+      fileChooser.setDialogTitle("Select an Embroidery File");
+      fileChooser.setDialogType(JFileChooser.OPEN_DIALOG);
+      FileNameExtensionFilter nameFilter = new FileNameExtensionFilter("Embroidery files (*.pes,*.dst,*.exp)", "pes", "dst", "exp");
+      fileChooser.addChoosableFileFilter(nameFilter);
+      fileChooser.setFileFilter(nameFilter);
+      fileChooser.setSelectedFile(new File(prefs.get("default.dir", "/")));
+      if (fileChooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
+        try {
+          File tFile = fileChooser.getSelectedFile();
+          prefs.put("default.dir", tFile.getAbsolutePath());
+          frame.setTitle(frame.getClass().getSimpleName() + " - " + tFile.toString());
+          stitchView.loadFile(tFile);
+        } catch (Exception ex) {
+          JOptionPane.showMessageDialog(frame, "Unable to load file", "Error", JOptionPane.PLAIN_MESSAGE);
+          ex.printStackTrace(System.out);
+        }
+      }
+    });
+    fileMenu.add(loadGbr);
+    menuBar.add(fileMenu);
+    frame.setJMenuBar(menuBar);
     frame.setResizable(false);
     frame.setLayout(new BorderLayout());
-    StitchView stitches = new StitchView(pattern);
-    frame.add(stitches, BorderLayout.CENTER);
-    JSlider slider = new JSlider(JSlider.HORIZONTAL, 0, pattern.getStitchCount(), pattern.getStitchCount());
-    slider.addChangeListener(ev -> stitches.setStep(slider.getValue()));
-    JPanel bottomPane = new JPanel(new BorderLayout());
-    bottomPane.setBorder(new EmptyBorder(0, 10, 0, 10));
-    bottomPane.add(slider, BorderLayout.CENTER);
-    JButton left = new JButton("\u25C0");
-    left.addActionListener(e -> stitches.decStep());
-    left.setPreferredSize(new Dimension(24, 12));
-    bottomPane.add(left, BorderLayout.WEST);
-    JButton right = new JButton("\u25B6");
-    right.addActionListener(e -> stitches.incStep());
-    right.setPreferredSize(new Dimension(24, 12));
-    bottomPane.add(right, BorderLayout.EAST);
-    frame.add(bottomPane, BorderLayout.SOUTH);
+    frame.add(stitchView, BorderLayout.CENTER);
     frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
     frame.pack();
     frame.setLocationRelativeTo(null);
     frame.setVisible(true);
   }
 
-  private static byte[] getFile (String file) throws IOException {
+  private static byte[] getFile (File file) throws IOException {
     InputStream fis = new BufferedInputStream(new FileInputStream(file));
     byte[] data = new byte[fis.available()];
     fis.read(data);
