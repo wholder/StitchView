@@ -2,7 +2,7 @@ import java.awt.*;
 
 /*
  *  Stitch file parser for .dst files used by Tajima commercial embroidery sewing machines
- *  Adapted from dstformat.js by Josh Varge (https://github.com/JoshVarga/html5-embroidery)
+ *  Adapted from dstformat.js by Josh Varga (https://github.com/JoshVarga/html5-embroidery)
  */
 
 class DstPattern extends StitchPattern {

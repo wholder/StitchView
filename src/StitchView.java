@@ -8,6 +8,8 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -22,44 +24,15 @@ class StitchView extends JPanel {
   private List<Point>         starts;
   private Rectangle           bounds;
   private Dimension           lastDim;
-  private JFrame              frame;
+  private JSlider             slider;
   private int                 aStep, numSteps;
 
   private StitchView (JFrame frame) {
-    this.frame = frame;
-    bounds = new Rectangle(0, 0, 640, 400);
-    setPreferredSize(new Dimension(640, 400));
-  }
-
-  private void loadFile (File file) throws IOException {
-    String fName = file.getName();
-    int idx = fName.lastIndexOf(".");
-    if (idx > 0) {
-      switch (fName.substring(idx + 1).toLowerCase()) {
-      case "pes":
-        pattern = new PesPattern(getFile(file));
-        break;
-      case "dst":
-        pattern = new DstPattern(getFile(file));
-        break;
-      case "exp":
-        pattern = new ExpPattern(getFile(file));
-        break;
-      default:
-        System.out.println("Unknown file type: " + fName);
-        return;
-      }
-    } else {
-      return;
-    }
-    bounds = pattern.getBounds();
-    setPreferredSize(new Dimension(bounds.width, bounds.height));
-    numSteps = aStep = pattern.getStitches().size();
     // Setup slider and button controls
-    JSlider slider = new JSlider(JSlider.HORIZONTAL, 0, pattern.getStitchCount(), pattern.getStitchCount());
-    slider.addChangeListener(ev -> setStep(slider.getValue()));
     JPanel bottomPane = new JPanel(new BorderLayout());
     bottomPane.setBorder(new EmptyBorder(0, 10, 0, 10));
+    slider = new JSlider(JSlider.HORIZONTAL, 0, 0, 0);
+    slider.addChangeListener(ev -> setStep(slider.getValue()));
     bottomPane.add(slider, BorderLayout.CENTER);
     JButton left = new JButton("\u25C0");
     left.addActionListener(e -> decStep());
@@ -69,8 +42,37 @@ class StitchView extends JPanel {
     right.addActionListener(e -> incStep());
     right.setPreferredSize(new Dimension(24, 12));
     bottomPane.add(right, BorderLayout.EAST);
+    frame.add(this, BorderLayout.CENTER);
     frame.add(bottomPane, BorderLayout.SOUTH);
-    frame.pack();
+  }
+
+  private void loadFile (String fName) throws Exception {
+    int idx = fName.lastIndexOf(".");
+    if (idx > 0) {
+      switch (fName.substring(idx + 1).toLowerCase()) {
+      case "pes":
+        pattern = new PesPattern(getFile(fName));
+        break;
+      case "dst":
+        pattern = new DstPattern(getFile(fName));
+        break;
+      case "exp":
+        pattern = new ExpPattern(getFile(fName));
+        break;
+      default:
+        System.out.println("Unknown file type: " + fName);
+        return;
+      }
+    } else {
+      return;
+    }
+    bounds = pattern.getBounds();
+    // Add 8 pixel border
+    bounds = new Rectangle(bounds.x - 8, bounds.y - 8, bounds.width + 16, bounds.height + 16);
+    setPreferredSize(new Dimension(bounds.width, bounds.height));
+    numSteps = aStep = pattern.getStitches().size();
+    slider.setMaximum(numSteps);
+    slider.setValue(numSteps);
     pattern.printColors();
     pattern.printInfo();
     repaint();
@@ -181,51 +183,60 @@ class StitchView extends JPanel {
   }
 
   public static void main (String[] args) {
-    JFrame frame = new JFrame("StitchView");
-    StitchView stitchView = new StitchView(frame);
-    JMenuBar menuBar = new JMenuBar();
-    // Add "File" Menu
-    JMenu fileMenu = new JMenu("File");
-    // Add "Open" Item to File Menu
-    JMenuItem loadGbr = new JMenuItem("Open Embroidery File");
-    loadGbr.addActionListener(ev -> {
-      JFileChooser fileChooser = new JFileChooser();
-      fileChooser.setDialogTitle("Select an Embroidery File");
-      fileChooser.setDialogType(JFileChooser.OPEN_DIALOG);
-      FileNameExtensionFilter nameFilter = new FileNameExtensionFilter("Embroidery files (*.pes,*.dst,*.exp)", "pes", "dst", "exp");
-      fileChooser.addChoosableFileFilter(nameFilter);
-      fileChooser.setFileFilter(nameFilter);
-      fileChooser.setSelectedFile(new File(prefs.get("default.dir", "/")));
-      if (fileChooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
-        try {
-          File tFile = fileChooser.getSelectedFile();
-          prefs.put("default.dir", tFile.getAbsolutePath());
-          frame.setTitle(frame.getClass().getSimpleName() + " - " + tFile.toString());
-          stitchView.loadFile(tFile);
-        } catch (Exception ex) {
-          JOptionPane.showMessageDialog(frame, "Unable to load file", "Error", JOptionPane.PLAIN_MESSAGE);
-          ex.printStackTrace(System.out);
+    try {
+      JFrame frame = new JFrame("StitchView");
+      frame.setLayout(new BorderLayout());
+      StitchView stitchView = new StitchView(frame);
+      JMenuBar menuBar = new JMenuBar();
+      // Add "File" Menu
+      JMenu fileMenu = new JMenu("File");
+      // Add "Open" Item to File Menu
+      JMenuItem loadGbr = new JMenuItem("Open Embroidery File");
+      loadGbr.addActionListener(ev -> {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select an Embroidery File");
+        fileChooser.setDialogType(JFileChooser.OPEN_DIALOG);
+        FileNameExtensionFilter nameFilter = new FileNameExtensionFilter("Embroidery files (*.pes,*.dst,*.exp)", "pes", "dst", "exp");
+        fileChooser.addChoosableFileFilter(nameFilter);
+        fileChooser.setFileFilter(nameFilter);
+        fileChooser.setSelectedFile(new File(prefs.get("default.dir", "/")));
+        if (fileChooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
+          try {
+            File tFile = fileChooser.getSelectedFile();
+            prefs.put("default.dir", tFile.getAbsolutePath());
+            frame.setTitle(frame.getClass().getSimpleName() + " - " + tFile.toString());
+            stitchView.loadFile(tFile.getCanonicalPath());
+            frame.pack();
+          } catch (Exception ex) {
+            JOptionPane.showMessageDialog(frame, "Unable to load file", "Error", JOptionPane.PLAIN_MESSAGE);
+            ex.printStackTrace(System.out);
+          }
         }
-      }
-    });
-    fileMenu.add(loadGbr);
-    menuBar.add(fileMenu);
-    frame.setJMenuBar(menuBar);
-    frame.setResizable(false);
-    frame.setLayout(new BorderLayout());
-    frame.add(stitchView, BorderLayout.CENTER);
-    frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-    frame.pack();
-    frame.setLocationRelativeTo(null);
-    frame.setVisible(true);
+      });
+      fileMenu.add(loadGbr);
+      menuBar.add(fileMenu);
+      frame.setJMenuBar(menuBar);
+      frame.setResizable(false);
+      stitchView.loadFile("res:StitchView2.dst");
+      frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+      frame.pack();
+      frame.setLocationRelativeTo(null);
+      frame.setVisible(true);
+    } catch (Exception ex) {
+      ex.printStackTrace();
+    }
   }
 
-  private static byte[] getFile (File file) throws IOException {
-    InputStream fis = new BufferedInputStream(new FileInputStream(file));
-    byte[] data = new byte[fis.available()];
-    fis.read(data);
-    fis.close();
-    return data;
+  private byte[] getFile (String fName) throws Exception {
+    if (fName.startsWith("res:")) {
+      return Files.readAllBytes(Paths.get(this.getClass().getClassLoader().getResource(fName.substring(4)).toURI()));
+    } else {
+      InputStream fis = new BufferedInputStream(new FileInputStream(new File(fName)));
+      byte[] data = new byte[fis.available()];
+      fis.read(data);
+      fis.close();
+      return data;
+    }
   }
 }
 

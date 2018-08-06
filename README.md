@@ -16,5 +16,5 @@ _Note: you may have to select the `StitchView.jar` file, then do a right click a
 ### License
 I'm publishing this source code under the MIT License (See: https://opensource.org/licenses/MIT)
 ## Credits
- - The embroidery file parsing code was adapted from Javascript by Josh Varge (https://github.com/JoshVarga/html5-embroidery)
+ - The embroidery file parsing code was adapted from Javascript by Josh Varga (https://github.com/JoshVarga/html5-embroidery)
  - [IntelliJ IDEA from JetBrains](https://www.jetbrains.com/idea/) (my favorite development environment for Java coding. Thanks JetBrains!)

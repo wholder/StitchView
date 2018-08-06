@@ -3,7 +3,7 @@ import java.util.ArrayList;
 
   /*
    *  Stitch file parser for .pes files used by Brother and Babylock embroidery home sewing machines
-   *  Adapted from pesformat.js by Josh Varge (https://github.com/JoshVarga/html5-embroidery)
+   *  Adapted from pesformat.js by Josh Varga (https://github.com/JoshVarga/html5-embroidery)
    */
 
 class PesPattern extends StitchPattern {

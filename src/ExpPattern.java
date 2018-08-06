@@ -4,7 +4,7 @@ class ExpPattern extends StitchPattern {
 
   /*
    *  Stitch file parser for .exp files used by Melco commercial embroidery sewing machines
-   *  Adapted from expformat.js by Josh Varge (https://github.com/JoshVarga/html5-embroidery)
+   *  Adapted from expformat.js by Josh Varga (https://github.com/JoshVarga/html5-embroidery)
    *
    *  Notes: https://github.com/Embroidermodder/Embroidermodder/issues/91
    */
